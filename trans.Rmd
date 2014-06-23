@@ -1,0 +1,131 @@
+---
+output: word_document
+---
+#Tranismissions:
+#Which will save you money at the pump?
+
+## Executive Summary
+
+We are here to answer the question "are manual transmissions better on gas than automatic transmissions". We used a dataset from the 1974 Motor Trend US magazine, and ran some statistical tests and a regression analysis.
+
+Although manual transmission cars in general do have higher MPG, yet, the MPG difference with the automatic ones may vary considerably, strongly affected by other characteristics like the cylinders of the engine or the total car weight.
+
+### Data Manipulation
+```{r,echo=TRUE}
+data(mtcars)
+auto <- split(mtcars, mtcars$am)[[1]]
+man <- split(mtcars, mtcars$am)[[2]]
+cars <- mtcars
+
+for (i in 1:length(cars$am)) {
+    if (cars$am[i] == 0) {
+        cars$am[i] <- "Automatic"
+    } else {
+        cars$am[i] <- "Manual"
+    }
+}
+
+car4 <- split(cars, cars$cyl)[[1]]
+car6 <- split(cars, cars$cyl)[[2]]
+car8 <- split(cars, cars$cyl)[[3]]
+
+```
+
+## Exploratory analysis
+
+Looking at some simple box plots allow us to make a good judgement that manual transmissions are easier on the wallet than automatic transmissions. This first box plot shows the overall difference between automatic and manual transmissions.
+
+```{r,echo=TRUE,fig.height=5,fig.width=5}
+boxplot(cars$mpg~cars$am,col= c('blue','red'), horizontal=T, xlab= 'Miles Per Gallon MPG')
+title("Boxplot for MPG")
+```
+
+I then wanted to look at the relation between the different cylinders. The following boxplots are split by cylinders.
+
+```{r,echo=TRUE,fig.height=3,fig.width=12}
+par(mfrow=c(1,3))
+boxplot(car4$mpg~car4$am,col= c('blue','red'), horizontal=T, xlab= 'Miles Per Gallon MPG')
+title("Boxplot for 4 Cyl")
+boxplot(car6$mpg~car6$am,col= c('blue','red'), horizontal=T, xlab= 'Miles Per Gallon MPG')
+title("Boxplot for 6 Cyl")
+boxplot(car8$mpg~car8$am,col= c('blue','red'), horizontal=T, xlab= 'Miles Per Gallon MPG')
+title("Boxplot for 8 Cyl")
+```
+
+As we split it by cylinders we can still see the trend that manual transmissions are more likely to produce higher miles per gallons. The 8 cylinder data however is inconclusive. The medians look about the same but there were only 2 observations for manual transmissions.
+
+```{r ,echo=TRUE,fig.width = 10, fig.height = 10}
+pairs(mtcars, panel = panel.smooth, main = "Pairs graph for MTCars")
+```
+
+## Statistical Analysis
+
+T test can make a more confirmed estimation of our visual analysis.
+
+```{r 'Inference all',echo=FALSE}
+means<-t.test(formula=mpg~am,data=cars)
+print(means)
+```
+The mean MPG for all manual transmission cars is 24.3923, and the automatic transmission is 17.1474.
+```{r 'Inference4',echo=FALSE}
+means<-t.test(formula=mpg~am,data=car4)
+print(means)
+```
+
+The mean MPG for the 4 cylinder manual transmission cars is 28.075, and the automatic transmission is 22.9.
+
+```{r 'Inference6',echo=FALSE}
+means<-t.test(formula=mpg~am,data=car6)
+print(means)
+```
+The mean MPG for the 6 cylinder manual transmission cars is 20.5667, and the automatic transmission is 19.125.
+
+```{r 'Inference8',echo=FALSE}
+means<-t.test(formula=mpg~am,data=car8)
+print(means)
+```
+The mean MPG for the 8 cylinder manual transmission cars is 15.4, and the automatic transmission is 15.05.
+
+## Regression Analysis.
+
+Quantyfing the difference between automatic and manual transmission MPG I used linear regression.
+
+```{r regression simp,echo=TRUE}
+simp_fit <- lm(mpg ~ am, data = mtcars)
+summary(simp_fit)
+```
+
+The Intercept (17.1474) represents the mean MPG for automatic cars, while the AM coefficient (7.2449), is the difference between the MPG of manual and automatic transmission cars, which matche exactly the results the T test produced. We therefore conclude that the MPG is affected by additional variables. In order to determine these variables we shall examine the correlation between the MPG and the rest of the variables.
+
+```{r sort,echo=F}
+sort(cor(mtcars)[1, ])
+```
+We see that the top variables related to *MPG* are: Wheight (wt), Number of Cylinders (cyl), Engine Displacement (disp) and Horse Power (hp), with considerable differences to the rest of the variables (keep in mind that in correlation, low negative numbers are as important as high positive ones). However, displacement is strongly related to the number of cylinders, so we shall include only the "wt","cyl"and "hp"" variables in a new model that we shall create and compare to the simple MPG~AM model.
+```{r}
+new_fit<-lm(mpg~wt+cyl+hp+am,data=mtcars)
+best_fit<-anova(simp_fit,new_fit)
+print(best_fit)
+```
+The comparison shows a very small ***p-value*** of `r best_fit[2,6]`, which allows us to reject the **Null Hypothesis** that the simple model may explain the *MPG* variable better, and thus opt for the multivariable model.
+
+## Residuals
+Before concluding, we should examine the residuals plot.
+```{r,fig.width=8,fig.height=7}
+par(mfrow=c(2,2))
+plot(new_fit)
+```
+
+Generaly we cannot notice anything out of line. The *Normal Q-Q* plot shows that the residuals are normaly distributed and the *Residuals vs Fitted* and *Scale Location* plots do not show any specific patterns. We may notice some outliers in the *Residuals vs Leverage* plot, but these are well within the Cook\'s Distance limits, so even if we removed them it would not change our model significantly.
+
+##In Conclusion
+Lastly, we shall analyse the new multivariable model to see how MPG is affected by each variable.
+```{r}
+summary(new_fit)
+```
+First of all the *R-squared* is `r summary(new_fit)$r.squared`, indicating that a great part of the variance is explained by this model. 
+According to the model, weight and number of cylinders have a negative effect on mileage. Specifically,
+
+  - The *MPG* of a car decreases by **`r summary(new_fit)$coefficients[2,1]`** for every **1000lbs** of extra weight.
+  - Each extra cylinder decreases the *MPG* by a factor of **`r summary(new_fit)$coefficients[3,1]`**.
+  - The car's HP does not affect consumption dramatically.
+  - Generally, cars with manual transmission, tend to produce **`r summary(new_fit)$coefficients[5,1]`** times more *miles per gallon*, compared with automatic transmission cars with the same weight, cylinders and horsepower.
